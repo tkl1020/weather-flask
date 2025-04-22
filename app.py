@@ -1,9 +1,18 @@
-from flask import Flask, render_template, request
+import os
+from dotenv import load_dotenv
 import requests
+from flask import Flask, render_template, request
+
+# ── Load local .env (only in development) ──────────────────────────
+load_dotenv()  # reads .env and populates os.environ
+# ────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
 
-API_KEY = "3693c91ad91148a707581e0b2a3481dd"  # your Weatherstack key
+# Grab the Weatherstack key from the environment
+API_KEY = os.getenv("WEATHERSTACK_ACCESS_KEY")
+if not API_KEY:
+    raise RuntimeError("Missing WEATHERSTACK_ACCESS_KEY in environment")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -15,36 +24,33 @@ def index():
         if not city:
             error = "Please enter a city name."
         else:
-            url = "https://api.weatherstack.com/current"  # Weatherstack current endpoint :contentReference[oaicite:0]{index=0}
+            url = "https://api.weatherstack.com/current"
             params = {
                 "access_key": API_KEY,
                 "query": city,
-                "units": "m"             # metric units by default, but explicit is fine :contentReference[oaicite:1]{index=1}
+                "units": "m"
             }
 
-            # ——— DEBUG INFO ———
+            # (Optional) debug
             response = requests.get(url, params=params)
-            print("→ Request URL:", response.url)
-            print("→ Status code:", response.status_code)
+            print("→ URL:", response.url)
+            print("→ Status:", response.status_code)
             print("→ Body:", response.text)
-            # ————————————
 
             if response.status_code == 200:
                 data = response.json()
-
-                # Weatherstack signals errors via a “success”:false flag
                 if data.get("success", True) is False:
                     error = data["error"].get("info", "Unknown API error")
                 else:
                     loc = data["location"]
                     cur = data["current"]
                     weather = {
-                        "city": loc.get("name"),
-                        "country": loc.get("country"),
+                        "city":        loc.get("name"),
+                        "country":     loc.get("country"),
                         "temperature": cur.get("temperature"),
                         "description": cur.get("weather_descriptions", [""])[0],
-                        "humidity": cur.get("humidity"),
-                        "wind": cur.get("wind_speed")
+                        "humidity":    cur.get("humidity"),
+                        "wind":        cur.get("wind_speed")
                     }
             else:
                 error = f"API error: HTTP {response.status_code}"
